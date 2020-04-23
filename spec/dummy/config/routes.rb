@@ -1,5 +1,7 @@
 Dummy::Application.routes.draw do
 
+  devise_for :devise_users
+
   namespace :admin do
     resources :users do
       resource :profile do
@@ -26,11 +28,14 @@ Dummy::Application.routes.draw do
       resources :posts
     end
     resources :news
-    resources :puffer_users
   end
 
   namespace :orms do
-    resources :mongoid_tests
+    resources :active_record_orm_primals
+    resources :mongoid_orm_primals
+    resources :has_one_references
   end
+
+  mount Puffer::Engine => '/'
 
 end

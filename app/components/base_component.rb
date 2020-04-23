@@ -1,7 +1,7 @@
 class BaseComponent < Puffer::Component::Base
 
   def index
-    opts[:record].call_chain(field.to_s)
+    @record.call_chain(field.to_s)
   end
 
   def form
@@ -9,7 +9,10 @@ class BaseComponent < Puffer::Component::Base
   end
 
   def filter
+  end
 
+  def permitted_params
+    field.field_name
   end
 
 end

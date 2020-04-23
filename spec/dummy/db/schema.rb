@@ -11,7 +11,35 @@
 #
 # It's strongly recommended to check this file into your version control system.
 
-ActiveRecord::Schema.define(:version => 20110912114129) do
+ActiveRecord::Schema.define(:version => 20120324063931) do
+
+  create_table "active_record_orm_has_many_references", :force => true do |t|
+    t.string   "name"
+    t.integer  "primal_id"
+    t.datetime "created_at", :null => false
+    t.datetime "updated_at", :null => false
+  end
+
+  create_table "active_record_orm_has_one_references", :force => true do |t|
+    t.string   "name"
+    t.integer  "primal_id"
+    t.datetime "created_at", :null => false
+    t.datetime "updated_at", :null => false
+  end
+
+  create_table "active_record_orm_primals", :force => true do |t|
+    t.string   "string_field"
+    t.text     "text_field"
+    t.string   "select_field"
+    t.integer  "integer_field"
+    t.float    "float_field"
+    t.decimal  "decimal_field"
+    t.datetime "datetime_field"
+    t.datetime "timestamp_field"
+    t.time     "time_field"
+    t.date     "date_field"
+    t.boolean  "boolean_field"
+  end
 
   create_table "categories", :force => true do |t|
     t.string   "title"
@@ -20,30 +48,40 @@ ActiveRecord::Schema.define(:version => 20110912114129) do
     t.integer  "lft"
     t.integer  "rgt"
     t.integer  "depth",      :default => 0
-    t.datetime "created_at"
-    t.datetime "updated_at"
+    t.datetime "created_at",                :null => false
+    t.datetime "updated_at",                :null => false
+  end
+
+  create_table "clearance_users", :force => true do |t|
+    t.string   "email"
+    t.string   "encrypted_password", :limit => 128
+    t.string   "salt",               :limit => 128
+    t.string   "confirmation_token", :limit => 128
+    t.string   "remember_token",     :limit => 128
+    t.datetime "created_at",                        :null => false
+    t.datetime "updated_at",                        :null => false
   end
 
   create_table "friendships", :force => true do |t|
     t.integer  "user_id"
     t.integer  "friend_id"
     t.string   "state"
-    t.datetime "created_at"
-    t.datetime "updated_at"
+    t.datetime "created_at", :null => false
+    t.datetime "updated_at", :null => false
   end
 
   create_table "news", :force => true do |t|
     t.string   "title"
     t.text     "body"
-    t.datetime "created_at"
-    t.datetime "updated_at"
+    t.datetime "created_at", :null => false
+    t.datetime "updated_at", :null => false
   end
 
   create_table "post_categories", :force => true do |t|
     t.integer  "post_id"
     t.integer  "category_id"
-    t.datetime "created_at"
-    t.datetime "updated_at"
+    t.datetime "created_at",  :null => false
+    t.datetime "updated_at",  :null => false
   end
 
   create_table "posts", :force => true do |t|
@@ -53,8 +91,8 @@ ActiveRecord::Schema.define(:version => 20110912114129) do
     t.string   "status"
     t.string   "filename"
     t.string   "type"
-    t.datetime "created_at"
-    t.datetime "updated_at"
+    t.datetime "created_at", :null => false
+    t.datetime "updated_at", :null => false
   end
 
   create_table "profiles", :force => true do |t|
@@ -62,16 +100,17 @@ ActiveRecord::Schema.define(:version => 20110912114129) do
     t.string   "name"
     t.string   "surname"
     t.date     "birth_date"
-    t.datetime "created_at"
-    t.datetime "updated_at"
+    t.string   "avatar"
+    t.datetime "created_at", :null => false
+    t.datetime "updated_at", :null => false
   end
 
   create_table "puffer_users", :force => true do |t|
     t.string   "email"
     t.string   "password_digest"
     t.string   "roles"
-    t.datetime "created_at"
-    t.datetime "updated_at"
+    t.datetime "created_at",      :null => false
+    t.datetime "updated_at",      :null => false
   end
 
   create_table "taggings", :force => true do |t|
@@ -86,15 +125,22 @@ ActiveRecord::Schema.define(:version => 20110912114129) do
 
   create_table "tags", :force => true do |t|
     t.string   "name"
-    t.datetime "created_at"
-    t.datetime "updated_at"
+    t.datetime "created_at", :null => false
+    t.datetime "updated_at", :null => false
   end
 
   create_table "users", :force => true do |t|
     t.string   "email"
     t.string   "password"
-    t.datetime "created_at"
-    t.datetime "updated_at"
+    t.datetime "created_at",                        :null => false
+    t.datetime "updated_at",                        :null => false
+    t.string   "encrypted_password", :limit => 128
+    t.string   "salt",               :limit => 128
+    t.string   "confirmation_token", :limit => 128
+    t.string   "remember_token",     :limit => 128
   end
+
+  add_index "users", ["email"], :name => "index_users_on_email"
+  add_index "users", ["remember_token"], :name => "index_users_on_remember_token"
 
 end

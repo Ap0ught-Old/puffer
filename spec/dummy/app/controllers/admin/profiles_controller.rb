@@ -1,4 +1,4 @@
-class Admin::ProfilesController < Puffer::Base
+class Admin::ProfilesController < Puffer::GridBase
 
   setup do
     group :users
@@ -8,7 +8,8 @@ class Admin::ProfilesController < Puffer::Base
     field 'user.email'
     field :name
     field :surname
-    field :birth_date
+    field :avatar
+    field :birth_date, :format => :long
   end
 
   form do
@@ -18,6 +19,7 @@ class Admin::ProfilesController < Puffer::Base
     end
     field :name
     field :surname
+    field :avatar
     field :birth_date
     field :created_at
   end

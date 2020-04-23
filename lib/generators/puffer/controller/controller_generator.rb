@@ -1,21 +1,37 @@
 class Puffer::ControllerGenerator < Rails::Generators::NamedBase
   source_root File.expand_path('../templates', __FILE__)
+  class_option :namespace, :type => :string, :default => 'Admin', :aliases => '-n',
+    :desc => 'Generated controller namespace'
+  class_option :controller_name, :type => :string, :aliases => '-c',
+    :desc => 'Generated controller name'
 
   def generate_controller
-    @modules = name.camelize.split('::')
-    @model_name = @modules.delete_at(-1)
+    path =  File.join(%W{app controllers #{options.namespace.to_s.underscore.presence} #{controller_name.underscore}_controller.rb})
+    template 'controller.rb', path
+  end
 
-    template 'controller.rb', "app/controllers/#{controller_name.underscore}_controller.rb"
+  def generate_routes
+    if options.namespace.present?
+      route "namespace :#{options.namespace.to_s.underscore} do\n    resources :#{controller_name.underscore}\n  end"
+    else
+      route "resources :#{controller_name.underscore}"
+    end
   end
 
 private
 
+  def model_name
+    @model_name ||= name.camelize
+  end
+
   def controller_name
-    [(swallow_nil{@modules.first} || 'Admin'), @model_name.pluralize].join('::')
+    @controller_name ||= options.controller_name.present? ?
+      options.controller_name.camelize.demodulize.pluralize :
+      model_name.demodulize.pluralize
   end
 
   def attributes
-    @model_name.constantize.to_adapter.column_names
+    @attributes ||= model_name.constantize.to_adapter.column_names
   end
 
 end

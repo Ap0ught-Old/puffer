@@ -20,15 +20,15 @@ a:hover
 	text-decoration: none;
 }
 
-h1
+h1, h1 *
 {
-    font-size: 21px;
+    font-size: 21px !important;
     margin-bottom: 10px;
 }
 
-h2
+h2, h2 *
 {
-    font-size: 17px;
+    font-size: 17px !important;
     margin-bottom: 10px;
 }
 
@@ -130,6 +130,10 @@ h2
     padding: 5px 12px;
 }
 
+.sidebar select {
+    width: 200px;
+}
+
 .sidebar .navigation, .dashboard .navigation
 {
     position: static;
@@ -137,6 +141,7 @@ h2
 
 .sidebar .navigation > li, .dashboard .navigation > li
 {
+    position: relative;
     display: block;
     margin-bottom: 5px;
 }
@@ -158,6 +163,13 @@ h2
     display: block;
 }
 
+.sidebar .navigation > li > .add_entity
+{
+    position: absolute;
+    top: 0;
+    right: 0;
+}
+
 .sidebar .navigation > li .additional dt
 {
     margin-bottom: 2px;
@@ -166,6 +178,11 @@ h2
 .sidebar .navigation > li .additional dd
 {
     margin-bottom: 8px;
+}
+
+.sidebar .navigation > li .additional dd.date_range input[type=text]
+{
+    width: 48%;
 }
 
 .sidebar .navigation > li .additional, .dashboard .navigation > li ul.additional
@@ -199,20 +216,20 @@ h2
 {
 	width: 100%;
 	display: table;
-	clear: both;
+}
+
+.fixed_layout
+{
+    table-layout: fixed;
 }
 
 .column
 {
 	display: table-cell;
 	vertical-align: top;
-}
-
-.column,
-{
-	display: inline;
-	vertical-align: top;
-    width: expression(function(t){
+    _display: inline;
+    _vertical-align: top;
+    _width: expression(function(t){
       var sum = 0;
       for (var i = 0; i < t.parentNode.childNodes.length; i++) {
         if (t.parentNode.childNodes[i] != t) {
@@ -220,8 +237,8 @@ h2
         }
       }
       return t.parentNode.clientWidth - sum + 'px';
-	}(this));
-	zoom: 1;
+    }(this));
+    zoom: 1;
 }
 
 .sidebar
@@ -277,6 +294,8 @@ h2
 .list_table *
 {
     font-size: 8pt;
+    margin: 0;
+    padding: 0;
 }
 
 .list_table tr
@@ -355,7 +374,8 @@ input[type=text], input[type=password], textarea
 
 input[type=text]:focus, input[type=password]:focus, textarea:focus
 {
-    border: #536C80 solid 1px;
+    /*border: #536C80 solid 1px;*/
+    box-shadow: 0 0 10px #a0ccef;
 }
 
 input[type=submit]
@@ -367,6 +387,7 @@ input[type=submit]
     text-shadow: -1px -1px 0 #304759;
     padding: 3px 10px;
     font-size: 11pt;
+    cursor: pointer;
 }
 
 select
@@ -406,7 +427,8 @@ select
     font-weight: bold;
 }
 
-.form li input[type=text], .form li input[type=password], .form li textarea
+.form li input[type=text], .form li input[type=password], .form li textarea,
+dd input[type=text], dd input[type=password], dd textarea
 {
     width: 100%;
 }
@@ -414,6 +436,13 @@ select
  .form li textarea
 {
     height: 60px;
+}
+
+.nested_attributes li
+{
+    border-left: 1px solid #ccc;
+    padding-left: 20px;
+    margin-bottom: 15px;
 }
 
 .field_error
@@ -467,4 +496,27 @@ select
 .association .rui-autocompleter li:hover .description
 {
     display: block;
+}
+
+.show_entry
+{
+    min-width: 900px;
+}
+
+.show_entry li
+{
+    list-style: none;
+    margin-bottom: 10px;
+}
+
+.locale
+{
+    float: left;
+    width: 60px;
+    line-height: 29px;
+}
+
+.locale_input
+{
+    margin-left: 60px;
 }

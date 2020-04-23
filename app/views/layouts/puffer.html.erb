@@ -1,52 +1,50 @@
 <% content_for :header do %>
   <ul class="namespaces">
-    <% puffer_namespaces do |title, path, current| %>
-      <li<%= raw(current ? ' class="selected"' : '') %>><%= link_to title, path %></li>
+    <% puffer_scopes_navigation do |title, path, current| %>
+      <li<%= raw(current ? ' class="selected"' : '') %>><%= link_to title.to_s.humanize, path %></li>
     <% end %>
   </ul>
   <ul class="navigation">
-    <% puffer_navigation do |title, path, current| %>
-      <li<%= raw(current ? ' class="selected"' : '') %>><%= link_to title, path %></li>
+    <% puffer_groups_navigation do |title, path, current| %>
+      <li<%= raw(current ? ' class="selected"' : '') %>><%= link_to title.to_s.humanize, path %></li>
     <% end %>
   </ul>
 <% end %>
 
 <% content_for :content do %>
-  <div class="columns">
+  <div class="columns fixed_layout">
     <div class="column sidebar">
       <div class="padder">
         <ul class="navigation">
-          <% sidebar_puffer_navigation do |title, path, current| %>
+          <% puffer_resources_navigation do |title, path, current| %>
             <li<%= raw(current ? ' class="selected"' : '') %>>
               <%= link_to title, path %>
+              <%= link_to '+', resource.new_path, :class => 'add_entity' if current && controller.configuration.create %>
               <% if current %>
                 <div class="additional">
                   <dl>
-                    <dt>Links</dt>
-                    <dd>
-                      <p>
-                        <%= link_to t(:list, :target => resource.human), resource.collection_path %>
-                        <%= link_to t(:add, :target => resource.human), resource.new_path %>
-                      </p>
-                      <p>
+                    <% if _collections.present? %>
+                      <dt>Links</dt>
+                      <dd>
                         <% _collections.each do |collection| %>
                           <%= link_to collection.label, resource.collection_path(:action => collection.action) if collection.display? && [:match, :get].include?(collection.method) %>
                         <% end %>
-                      </p>
-                    </dd>
-                    <dt>Search</dt>
-                    <dd>
-                      <%= form_tag resource.collection_path, {:method => :get} do %>
-                        <%= text_field_tag :search, params[:search] %>
-                        <%= submit_tag 'Search' %>
+                      </dd>
+                    <% end %>
 
-                        <% if false %>
-                        <% if resource_session[:search].present? %>
-                          <%= link_to 'clear', resource.collection_path %>
-                        <% end %>
-                        <% end %>
+                    <%= form_for puffer_filters, :url => resource.collection_path, :method => :get do |f| %>
+                      <dt><%= f.label :puffer_search %></dt>
+                      <dd><%= f.text_field :puffer_search %></dd>
+                      <dt><%= f.label :puffer_per_page %></dt>
+                      <dd><%= f.text_field :puffer_per_page %></dd>
+
+                      <% filter_fields.columns.each do |field| %>
+                        <%= field.render :filter, controller, puffer_filters %>
                       <% end %>
-                    </dd>
+
+                      <dd><%= submit_tag 'Search', :name => nil %></dd>
+                    <% end %>
+
                   </dl>
                 </div>
               <% end %>
@@ -57,7 +55,7 @@
       </div>
     </div>
     <div class="column">
-      <div class="content">
+      <div class="content" id="content">
         <%= yield %>
       </div>
     </div>

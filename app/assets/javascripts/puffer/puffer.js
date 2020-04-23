@@ -1,6 +1,6 @@
 var association_done = function(event) {
   current = this.first('li.current');
-  this.input.next('input[type=hidden]').value(current.get('data-id'));
+  this.input.next('input[type=hidden]').value(current.data('id'));
   this.input.value(current.find('.title').first().html().stripTags()).disable();
 }
 
@@ -18,5 +18,37 @@ var association_done = function(event) {
     dialog = new Dialog({expandable: true});
   }
 
-  dialog.load(this.get('data-dialog-uri'));
+  dialog.load(this.data('dialog-uri'));
+});
+
+'a[data-new-dialog-uri]'.on('click', function(event) {
+  if (event.which != 1) return;
+  event.stop();
+
+  new Dialog({expandable: true}).load(this.get('data-new-dialog-uri'));
+});
+
+'a[data-sortable]'.on('mousedown', function(event) {
+  if (event.which != 1) return;
+
+  new Sortable(this, this.data('sortable'));
+});
+
+$(document).on('ready', function(event) {
+  $$('[data-sortable]').each(function(element) {
+    new Sortable(element);
+  });
+});
+
+$(document).on('ctrl+s', function(event) {
+  $$('form[data-send]').each(function(element) {
+    element.fire('data:sending');
+    element.send({
+      onCreate:   function() { $(document).fire('ajax:loading',  {xhr: this}); },
+      onComplete: function() { $(document).fire('ajax:complete', {xhr: this}); },
+      onSuccess:  function() { $(document).fire('ajax:success',  {xhr: this}); },
+      onFailure:  function() { $(document).fire('ajax:failure',  {xhr: this}); }
+    });
+  });
+  event[0].stop();
 });

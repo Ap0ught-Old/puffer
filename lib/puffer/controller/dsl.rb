@@ -1,9 +1,83 @@
 module Puffer
   module Controller
     module Dsl
+
+      module Fieldsets
+        extend ActiveSupport::Concern
+
+        included do
+          delegate :fields, :to => 'self.class'
+        end
+
+        module ClassMethods
+          def define_fieldset *actions
+            options = actions.extract_options!
+            actions.each{|action| define_fieldset(action, options)} and return if actions.many?
+
+            action = actions.first
+            fallbacks = Array.wrap(options[:fallbacks]).map(&:to_sym)
+
+            self._fieldset_fallbacks[action] = [action] + fallbacks
+
+            class_attribute "_#{action}_fields"
+            delegate "#{action}_fields", :to => 'self.class'
+            helper_method "#{action}_fields"
+
+            define_fieldset_reader_for action
+            define_fieldset_writer_for action
+          end
+
+          def define_fieldset_reader_for action
+            define_singleton_method "#{action}_fields" do
+              actions = self._fieldset_fallbacks[action].dup
+              last = actions.pop
+              actions.map do |action|
+                send("_#{action}_fields").presence
+              end.compact.first || send("_#{last}_fields")
+            end
+          end
+
+          def define_fieldset_writer_for action
+            define_singleton_method action do |&block|
+              @_super_fields = send("_#{action}_fields")
+              @_fields = send("_#{action}_fields=", Puffer::Fieldset.new(action, model))
+              block.call if block
+              remove_instance_variable :@_fields
+              remove_instance_variable :@_super_fields
+            end
+          end
+
+          def fields set
+            segments = set.split ?:
+            fieldset = send "#{segments.first}_fields"
+            segments[1..-1].each do |segment|
+              fieldset = fieldset[segment].children
+            end
+            fieldset
+          end
+
+          def super_fields
+            @_super_fields.copy_to @_fields, model if @_super_fields && @_fields
+          end
+
+          def field name, options = {}, &block
+            field = @_fields.field(name, options, &block) if @_fields
+            if field && block
+              fields_was, @_fields = @_fields, field.children
+              block.call
+              @_fields = fields_was
+            end
+            field
+          end
+
+        end
+      end
+
       extend ActiveSupport::Concern
 
       included do
+        include Fieldsets
+
         class_attribute :_members
         self._members = Puffer::Controller::Actions.new :member
         class_attribute :_collections
@@ -14,14 +88,7 @@ module Puffer
         helper_method :_members, :_collections
       end
 
-      module InstanceMethods
-        def fields set
-          self.class.fields set
-        end
-      end
-
       module ClassMethods
-
         def inherited klass
           klass._members = _members.dup
           klass._collections = _collections.dup
@@ -38,56 +105,7 @@ module Puffer
           _collections.controller = self
           block.bind(_collections).call if block_given?
         end
-
-        def define_fieldset *actions
-          options = actions.extract_options!
-          fallbacks = Array.wrap(options.delete(:fallbacks)).map(&:to_sym)
-
-          actions.each do |action|
-            self._fieldset_fallbacks[action] = [action] + fallbacks
-
-            class_attribute "_#{action}_fields"
-            send "_#{action}_fields=", Puffer::FieldSet.new unless send("_#{action}_fields?")
-            helper_method "#{action}_fields"
-
-            self.class.instance_eval do
-              define_method action do |&block|
-                @_super_fields = send("_#{action}_fields")
-                @_fields = send("_#{action}_fields=", Puffer::FieldSet.new(action))
-                block.call if block
-                remove_instance_variable :@_fields
-                remove_instance_variable :@_super_fields
-              end
-
-              define_method "#{action}_fields" do
-                actions = self._fieldset_fallbacks[action].dup
-                last = actions.pop
-                actions.map do |action|
-                  send("_#{action}_fields").presence
-                end.compact.first || send("_#{last}_fields")
-              end
-            end
-
-            define_method "#{action}_fields" do
-              self.class.send "#{action}_fields"
-            end
-          end
-        end
-
-        def fields set
-          send "#{set}_fields"
-        end
-
-        def field name, options = {}, &block
-          field = @_fields.field(name, model, options, &block) if @_fields
-        end
-
-        def super_fields
-          @_super_fields.copy_to @_fields, model if @_super_fields && @_fields
-        end
-
       end
-
     end
   end
 end

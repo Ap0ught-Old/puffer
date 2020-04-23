@@ -1,17 +1,15 @@
-<% Rails.application.routes.puffer.each do |(namespace, groups)| %>
-  <h2><%= namespace.to_s.humanize %></h2>
-  <ul class="navigation">
-    <% groups.each do |(group, controllers)| %>
-      <li>
-        <span><%= group.to_s.humanize %></span>
-        <ul class="additional">
-          <% controllers.each do |controller| %>
-            <li>
-              <%= link_to controller.model.model_name.human, polymorphic_url([namespace, controller.model]) %>
-            </li>
-          <% end %>
-        </ul>
-      </li>
-    <% end %>
-  </ul>
-<% end %>
+<h2><%= puffer_namespace.to_s.humanize %></h2>
+<ul class="navigation">
+  <% puffer_groups_navigation do |group| %>
+    <li>
+      <span><%= group.to_s.humanize %></span>
+      <ul class="additional">
+        <% puffer_resources_navigation group do |resource, url| %>
+          <li>
+            <%= link_to resource, url %>
+          </li>
+        <% end %>
+      </ul>
+    </li>
+  <% end %>
+</ul>

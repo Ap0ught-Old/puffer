@@ -2,6 +2,8 @@ class Admin::UsersController < Puffer::Base
 
   setup do
     group :users
+    order 'email desc'
+    show true
   end
 
   member do
@@ -15,6 +17,7 @@ class Admin::UsersController < Puffer::Base
   index do
     field :email
     field :password, :type => :password
+    field :posts
   end
 
   form do

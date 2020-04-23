@@ -1,0 +1,15 @@
+<% @title = "Edit #{resource.human}" %>
+<h1><%= @title %></h1>
+<%= form_for record, :url => resource.member_path(@record), :html => {:multipart => true, :data => {:send => true}} do |f| %>
+  <ul class="form" data-entity-model="<%= record.class.model_name.to_s.underscore %>" data-entity-id="<%= record.id %>">
+  <% update_fields.each do |field| -%>
+    <li><%= field.render :update, controller, record %></li>
+  <% end -%>
+  </ul>
+
+  <div class="buttons">
+    <%= f.submit t('puffer.save') %>
+    <%= f.submit t('puffer.save_and_exit') %>
+    <%= link_to 'cancel', (request.referer || resource.collectin_path) %>
+  </div>
+<% end %>

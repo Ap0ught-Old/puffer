@@ -1,8 +1,8 @@
 /**
- * RightJS v2.2.3 - http://rightjs.org
+ * RightJS v2.3.1 - http://rightjs.org
  * Released under the terms of MIT license
  *
- * Copyright (C) 2008-2011 Nikolay Nemshilov
+ * Copyright (C) 2008-2012 Nikolay Nemshilov
  */
 /**
  * The basic layout for RightJS builds
@@ -20,8 +20,8 @@ var RightJS = function(value) {
   return value; // <- a dummy method to emulate the safe-mode
 };
 
-RightJS.version = "2.2.3";
-RightJS.modules =["core", "dom", "form", "events", "xhr", "fx", "cookie", "olds"];
+RightJS.version = "2.3.1";
+RightJS.modules =["core", "dom", "form", "events", "xhr", "fx", "cookie"];
 
 
 
@@ -157,7 +157,7 @@ isString = RightJS.isString = function(value) {
  * @return boolean check result
  */
 isNumber = RightJS.isNumber = function(value) {
-  return typeof(value) === 'number';
+  return typeof(value) === 'number' && !isNaN(value);
 },
 
 /**
@@ -471,8 +471,8 @@ $ext(Object, {
    * @return Object merged object
    */
   merge: function() {
-    var object = {}, i=0, args=arguments, key;
-    for (l = args.length; i < l; i++) {
+    var object = {}, i=0, args=arguments, l=args.length, key;
+    for (; i < l; i++) {
       if (isHash(args[i])) {
         for (key in args[i]) {
           object[key] = isHash(args[i][key]) && !(args[i][key] instanceof Class) ?
@@ -490,17 +490,55 @@ $ext(Object, {
    * @return String query
    */
   toQueryString: function(object) {
-    var tokens = [], key, value, encode = encodeURIComponent;
-    for (key in object) {
-      value = ensure_array(object[key]);
-      for (var i=0, l = value.length; i < l; i++) {
-        tokens.push(encode(key) +'='+ encode(value[i]));
-      }
+    var entries = to_query_string_map(object), i=0, result = [];
+
+    for (; i < entries.length; i++) {
+      result.push(encodeURIComponent(entries[i][0]) + "=" + encodeURIComponent(''+entries[i][1]));
     }
-    return tokens.join('&');
+
+    return result.join('&');
   }
 }, true);
 
+// private
+
+/**
+ * pre-converts nested objects into a flat key-value structure
+ *
+ * @param {Object} data-hash
+ * @param {String} key-prefix
+ * @return {Array} key-value pairs
+ */
+function to_query_string_map(hash, prefix) {
+  var result = [], key, value, i;
+
+  for (key in hash) {
+    value = hash[key];
+    if (prefix) {
+      key = prefix + "["+ key + "]";
+    }
+
+    if (typeof(value) === 'object') {
+      if (isArray(value)) {
+        if (!key.endsWith('[]')) {
+          key += "[]";
+        }
+        for (i=0; i < value.length; i++) {
+          result.push([key, value[i]]);
+        }
+      } else if (value) { // assuming it's an object
+        value = to_query_string_map(value, key);
+        for (i=0; i < value.length; i++) {
+          result.push(value[i]);
+        }
+      }
+    } else {
+      result.push([key, value]);
+    }
+  }
+
+  return result;
+}
 
 /**
  * here are the starndard Math object extends
@@ -1123,6 +1161,15 @@ String.include({
   },
 
   /**
+   * Makes a dashed version of the string
+   *
+   * @return String dashed version
+   */
+  dasherize: function() {
+    return this.underscored().replace(/_/g, '-');
+  },
+
+  /**
    * checks if the string contains the given substring
    *
    * @param String string
@@ -1416,6 +1463,80 @@ RegExp.escape = function(string) {
   return (''+string).replace(/([.*+?\^=!:${}()|\[\]\/\\])/g, '\\$1');
 };
 
+
+if (!window.JSON) {
+  window.JSON = (function() {
+    var
+    // see the original JSON decoder implementation for descriptions http://www.json.org/json2.js
+    cx = /[\u0000\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
+    specials = {'\b': '\\b', '\t': '\\t', '\n': '\\n', '\f': '\\f', '\r': '\\r', '"' : '\\"', '\\': '\\\\'},
+    quotables = /[\\\"\x00-\x1f\x7f-\x9f\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g;
+
+
+    // quotes the string
+    function quote(string) {
+      return string.replace(quotables, function(chr) {
+        return specials[chr] || '\\u' + ('0000' + chr.charCodeAt(0).toString(16)).slice(-4);
+      });
+    }
+
+    // adds the leading zero symbol
+    function zerofy(num) {
+      return (num < 10 ? '0' : '')+num;
+    }
+
+    return {
+      stringify: function(value) {
+        switch(typeof(value)) {
+          case 'boolean': return String(value);
+          case 'number':  return String(value+0);
+          case 'string':  return '"'+ quote(value) + '"';
+          case 'object':
+            if (value === null) {
+              return 'null';
+            } else if (isArray(value)) {
+              return '['+$A(value).map(JSON.stringify).join(',')+']';
+
+            } else if (to_s.call(value) === '[object Date]') {
+              return '"' + value.getUTCFullYear() + '-' +
+                zerofy(value.getUTCMonth() + 1)   + '-' +
+                zerofy(value.getUTCDate())        + 'T' +
+                zerofy(value.getUTCHours())       + ':' +
+                zerofy(value.getUTCMinutes())     + ':' +
+                zerofy(value.getUTCSeconds())     + '.' +
+                zerofy(value.getMilliseconds())   + 'Z' +
+              '"';
+
+            } else {
+              var result = [], key;
+              for (key in value) {
+                result.push('"'+key+'":'+JSON.stringify(value[key]));
+              }
+              return '{'+result.join(',')+'}';
+            }
+        }
+      },
+
+      parse: function(string) {
+        if (isString(string) && string) {
+          // getting back the UTF-8 symbols
+          string = string.replace(cx, function (a) {
+            return '\\u' + ('0000' + a.charCodeAt(0).toString(16)).slice(-4);
+          });
+
+          // checking the JSON string consistency
+          if (/^[\],:{}\s]*$/.test(string.replace(/\\(?:["\\\/bfnrt]|u[0-9a-fA-F]{4})/g, '@')
+            .replace(/"[^"\\\n\r]*"|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/g, ']')
+            .replace(/(?:^|:|,)(?:\s*\[)+/g, ''))) {
+              return new Function('return '+string)();
+            }
+        }
+
+        throw "JSON parse error: "+string;
+      }
+    };
+  })();
+}
 
 /**
  * The basic Class unit
@@ -2333,11 +2454,13 @@ make_element = function (tag, options) {
 //
 if (IE8_OR_LESS) {
   make_element = function(tag, options) {
-    if (tag === 'input' && options !== undefined) {
-      tag = '<input name="'+ options.name +
-        '" type='+ options.type +
-        (options.checked ? ' checked' : '') +
-      '/>';
+    if (options !== undefined && (tag === 'input' || tag === 'button')) {
+      tag = '<'+ tag +' name="'+ options.name +
+        '" type="'+ options.type +'"'+
+        (options.checked ? ' checked' : '') + ' />';
+
+      delete(options.name);
+      delete(options.type);
     }
 
     return document.createElement(tag);
@@ -2551,8 +2674,9 @@ Element.include({
    * @return String text content or Element this
    */
   text: function(text) {
-    return text === undefined ? (this._.textContent || this._.innerText) :
-      this.update(this.doc()._.createTextNode(text));
+    return text === undefined ? (
+      this._.textContent === undefined ? this._.innerText : this._.textContent
+    ) : this.update(this.doc()._.createTextNode(text));
   },
 
   /**
@@ -2956,7 +3080,9 @@ Element.include({
         if (!(key in element)) {
           element.setAttribute(key, ''+hash[key]);
         }
-        element[key] = hash[key];
+        if (key.substr(0,5) !== 'data-') {
+          element[key] = hash[key];
+        }
       }
     }
 
@@ -3077,6 +3203,60 @@ Element.include({
   radio: function(effect, options) {
     this.siblings().each('hide', effect, options);
     return this.show();
+  },
+
+  /**
+   * Sets/gets the `data-smth` data attribute and
+   * automatically converts everything in/out JSON
+   *
+   * @param String key name
+   * @param mixed data or `undefined` to erase
+   * @return mixed Element self or extracted data
+   */
+  data: function(key, value) {
+    var name, result, match, attrs, attr, i;
+
+    if (isHash(key)) {
+      for (name in key) {
+        value = this.data(name, key[name]);
+      }
+    } else if (value === undefined) {
+      key = 'data-'+ (''+key).dasherize();
+
+      for (result = {}, match = false, attrs = this._.attributes, i=0; i < attrs.length; i++) {
+        value = attrs[i].value;
+        try { value = JSON.parse(value); } catch (e) {}
+
+        if (attrs[i].name === key) {
+          result = value;
+          match  = true;
+          break;
+        } else if (attrs[i].name.indexOf(key) === 0) {
+          result[attrs[i].name.substring(key.length+1).camelize()] = value;
+          match = true;
+        }
+      }
+
+      value = match ? result : null;
+    } else {
+      key = 'data-'+ (''+key).dasherize();
+
+      if (!isHash(value)) { value = {'': value}; }
+
+      for (name in value) {
+        attr = name.blank() ? key : key+'-'+name.dasherize();
+
+        if (value[name] === null) {
+          this._.removeAttribute(attr);
+        } else {
+          this._.setAttribute(attr, isString(value[name]) ? value[name] : JSON.stringify(value[name]));
+        }
+      }
+
+      value = this;
+    }
+
+    return value;
   }
 });
 
@@ -3591,7 +3771,15 @@ var Form = RightJS.Form = Element_wrappers.FORM = new Class(Element, {
    * @return Input field
    */
   input: function(name) {
-    return wrap(this._[name]);
+    var input = this._[name];
+
+    if ('tagName' in input) {
+      input = wrap(input);
+    } else { // a list of radio-buttons (coz they have all the same name)
+      input = $A(input).map(wrap);
+    }
+
+    return input;
   },
 
   /**
@@ -3645,20 +3833,36 @@ var Form = RightJS.Form = Element_wrappers.FORM = new Class(Element, {
    * @return Object values
    */
   values: function() {
-    var values = {}, value, name, element, input;
+    var values = {};
 
-    this.inputs().each(function(element) {
-      input = element._;
-      name  = input.name;
-      if (!input.disabled && name && (
-        !['checkbox', 'radio'].include(input.type) || input.checked
-      )) {
-        value = element.getValue();
-        if (name.endsWith('[]')) {
-          value = (values[name] || []).concat([value]);
+    this.inputs().each(function (element) {
+      var input = element._,
+          hash  = values, key,
+          keys  = input.name.match(/[^\[]+/g);
+
+      if (!input.disabled && input.name && (!(input.type === 'checkbox' || input.type === 'radio') || input.checked)) {
+        // getting throught the smth[smth][smth][] in the name
+        while (keys.length > 1) {
+          key  = keys.shift();
+          if (key.endsWith(']')) {
+            key  = key.substr(0, key.length-1);
+          }
+          if (!hash[key]) {
+            hash[key] = keys[0] === ']' ? [] : {};
+          }
+          hash = hash[key];
         }
 
-        values[name] = value;
+        key  = keys.shift();
+        if (key.endsWith(']')) {
+          key = key.substr(0, key.length-1);
+        }
+
+        if (key === '') { // an array
+          hash.push(element.value());
+        } else {
+          hash[key] = element.value();
+        }
       }
     });
 
@@ -4563,10 +4767,6 @@ var Xhr = RightJS.Xhr = new Class(Observer, {
 
   // prepares user sending params
   prepareParams: function(params) {
-    if (params && params instanceof Form) {
-      this.form = params;
-      params = params.values();
-    }
     return params;
   },
 
@@ -4598,40 +4798,31 @@ var Xhr = RightJS.Xhr = new Class(Observer, {
   // called on success
   tryScripts: function(response) {
     var content_type = this.getHeader('Content-type');
+    var x_json_data  = this.getHeader('X-JSON');
+
+    if (x_json_data) {
+      this.json = this.responseJSON = this.headerJSON = JSON.parse(x_json_data);
+    }
 
     if (this.evalResponse || (this.evalJS && /(ecma|java)script/i.test(content_type))) {
       $eval(this.text);
     } else if (/json/.test(content_type) && this.evalJSON) {
-      this.json = this.responseJSON = this.sanitizedJSON();
+      this.json = this.responseJSON = JSON.parse(this.text);
     } else if (this.evalScripts) {
       this.text.evalScripts();
     }
-  },
-
-  // sanitizes the json-response texts
-  sanitizedJSON: function() {
-    if (!(/^[,:{}\[\]0-9.\-+Eaeflnr-u \n\r\t]*$/).test(
-      this.text.replace(/\\./g, '@').replace(/"[^"\\\n\r]*"/g, '')
-    )) {
-      if (this.secureJSON) {
-        throw "JSON error: "+this.text;
-      }
-      return null;
-    }
-
-    return 'JSON' in window ? JSON.parse(this.text) :
-      (new Function("return "+this.text))();
   },
 
   // initializes the request callbacks
   initCallbacks: function() {
     // connecting basic callbacks
     this.on({
-      success:  'tryScripts',
       create:   'showSpinner',
       complete: 'hideSpinner',
       cancel:   'hideSpinner'
     });
+
+    this.on('complete', 'tryScripts');
 
     // wiring the global xhr callbacks
     Xhr.EVENTS.each(function(name) {
@@ -4766,6 +4957,22 @@ function Form_remote_send(event, options) {
   event.stop();
   this.send(options);
 }
+
+/**
+ * Adds Xhr params handling if a Form element is passed to Xhr#send
+ *
+ * @param Object params - could be Hash or Form element
+ * @return Object
+ */
+Xhr.include({
+  prepareParams: function(params) {
+    if (params && params instanceof Form) {
+      this.form = params;
+      params = params.values();
+    }
+    return params;
+  }
+});
 
 
 /**
@@ -4940,7 +5147,9 @@ Xhr.JSONP = new Class({
  *
  * Credits:
  *   The basic principles, structures and naming system are inspired by
- *     - MooTools  (http://mootools.net)      Copyright (C) Valerio Proietti
+ *     - MooTools  (http://mootools.net) Copyright (C) Valerio Proietti
+ *   The cubic bezier emulation is backported from
+ *     - Lovely.IO (http://lovely.io) Copytirhgt (C) Nikolay Nemshilov
  *
  * Copyright (C) 2008-2011 Nikolay V. Nemshilov
  */
@@ -4959,31 +5168,9 @@ var Fx = RightJS.Fx = new Class(Observer, {
     Options: {
       fps:        IE8_OR_LESS ? 40 : 60,
       duration:   'normal',
-      transition: 'Sin',
-      queue:      true
-    },
-
-    // list of basic transitions
-    Transitions: {
-      Sin: function(i)  {
-        return -(Math.cos(Math.PI * i) - 1) / 2;
-      },
-
-      Cos: function(i) {
-        return Math.asin((i-0.5) * 2)/Math.PI + 0.5;
-      },
-
-      Exp: function(i) {
-        return Math.pow(2, 8 * (i - 1));
-      },
-
-      Log: function(i) {
-        return 1 - Math.pow(2, - 8 * i);
-      },
-
-      Lin: function(i) {
-        return i;
-      }
+      transition: 'default',
+      queue:      true,
+      engine:     'css'
     }
   },
 
@@ -5006,17 +5193,11 @@ var Fx = RightJS.Fx = new Class(Observer, {
   start: function() {
     if (fx_add_to_queue(this, arguments)) { return this; }
 
-    var options    = this.options,
-        duration   = Fx.Durations[options.duration] || options.duration,
-        transition = Fx.Transitions[options.transition] || options.transition,
-        steps      = (duration / 1000 * this.options.fps).ceil(),
-        interval   = (1000 / this.options.fps).round();
-
     fx_mark_current(this);
 
     this.prepare.apply(this, arguments);
 
-    fx_start_timer(this, transition, interval, steps);
+    fx_start_timer(this);
 
     return this.fire('start', this);
   },
@@ -5150,19 +5331,22 @@ function fx_cancel_all(element) {
  * Initializes the fx rendering timer
  *
  * @param Fx fx
- * @param Function transition stops calculator
- * @param Float interval
- * @param Integer number of steps
  * @return void
  */
-function fx_start_timer(fx, transition, interval, steps) {
-  var number = 1;
+function fx_start_timer(fx) {
+  var options    = fx.options,
+      duration   = Fx.Durations[options.duration] || options.duration,
+      steps      = Math.ceil(duration / 1000 * options.fps),
+      transition = Bezier_sequence(options.transition, steps),
+      interval   = Math.round(1000 / options.fps),
+      number     = 0;
+
   fx._timer = setInterval(function() {
-    if (number > steps) {
+    if (number === steps) {
       fx.finish();
     } else {
-      fx.render(transition(number/steps));
-      number ++;
+      fx.render(transition[number]);
+      number++;
     }
   }, interval);
 }
@@ -5179,6 +5363,82 @@ function fx_stop_timer(fx) {
   }
 }
 
+
+///////////////////////////////////////////////////////////////////////////////
+// CSS3 Cubic Bezier sequentions emulator
+// Backport from Lovely.IO (http://lovely.io)
+// See also:
+// http://st-on-it.blogspot.com/2011/05/calculating-cubic-bezier-function.html
+///////////////////////////////////////////////////////////////////////////////
+
+// CSS3 cubic-bezier presets
+var Bezier_presets = {
+  'default':     '(.25,.1,.25,1)',
+  'linear':      '(0,0,1,1)',
+  'ease-in':     '(.42,0,1,1)',
+  'ease-out':    '(0,0,.58,1)',
+  'ease-in-out': '(.42,0,.58,1)',
+  'ease-out-in': '(0,.42,1,.58)'
+},
+
+// Bezier loockup tables cache
+Bezier_cache = {};
+
+// builds a loockup table of parametric values with a given size
+function Bezier_sequence(params, size) {
+  params = Bezier_presets[params] || native_fx_functions[params] || params;
+  params = params.match(/([\d\.]+)[\s,]+([\d\.]+)[\s,]+([\d\.]+)[\s,]+([\d\.]+)/);
+  params = [0, params[1]-0, params[2]-0, params[3]-0, params[4]-0]; // cleaning up
+
+  var name = params.join(',') + ',' + size, Cx, Bx, Ax, Cy, By, Ay, sequence, step, x;
+
+  function bezier_x(t) { return t * (Cx + t * (Bx + t * Ax)); }
+  function bezier_y(t) { return t * (Cy + t * (By + t * Ay)); }
+
+  // a quick search for a more or less close parametric
+  // value using several iterations by Newton's method
+
+  function bezier_x_der(t) { // bezier_x derivative
+    return Cx + t * (2*Bx + t * 3*Ax) + 1e-3;
+  }
+  function find_parametric(t) {
+    var x=t, i=0, z;
+
+    while (i < 5) {
+      z = bezier_x(x) - t;
+
+      if (Math.abs(z) < 1e-3) { break; }
+
+      x = x - z/bezier_x_der(x);
+      i++;
+    }
+
+    return x;
+  }
+
+  if (!(name in Bezier_cache)) {
+    // defining bezier functions in a polynomial form (coz it's faster)
+    Cx = 3 * params[1];
+    Bx = 3 * (params[3] - params[1]) - Cx;
+    Ax = 1 - Cx - Bx;
+
+    Cy = 3 * params[2];
+    By = 3 * (params[4] - params[2]) - Cy;
+    Ay = 1 - Cy - By;
+
+
+    // building the actual lookup table
+    Bezier_cache[name] = sequence = [];
+    x=0; step=1/size;
+
+    while (x < 1.0001) { // should include 1.0
+      sequence.push(bezier_y(find_parametric(x)));
+      x += step;
+    }
+  }
+
+  return Bezier_cache[name];
+}
 
 /**
  * There are the String unit extensions for the effects library
@@ -5423,7 +5683,7 @@ native_fx_function   = native_fx_transition + 'TimingFunction',
 native_fx_functions  = {
   Sin: 'cubic-bezier(.3,0,.6,1)',
   Cos: 'cubic-bezier(0,.3,.6,0)',
-  Log: 'cubic-bezier(0.6,.3,.8)',
+  Log: 'cubic-bezier(0,.6,.3,.8)',
   Exp: 'cubic-bezier(.6,0,.8,.3)',
   Lin: 'cubic-bezier(0,0,1,1)'
 };
@@ -5900,7 +6160,7 @@ Fx.Scroll = new Class(Fx.Attr, {
     this.$super(
       element instanceof Window ?
         element._.document[
-          'body' in element._.document ? 'body' : 'documentElement'
+          Browser.WebKit ? 'body' : 'documentElement'
         ] : element,
       options
     );
@@ -5936,12 +6196,12 @@ var Cookie = RightJS.Cookie = new Class({
       return new this(name, options).set(value);
     },
     // gets the cookie
-    get: function(name) {
-      return new this(name).get();
+    get: function(name, options) {
+      return new this(name, options).get();
     },
     // deletes the cookie
-    remove: function(name) {
-      return new this(name).remove();
+    remove: function(name, options) {
+      return new this(name, options).remove();
     },
 
     // checks if the cookies are enabled
@@ -5975,7 +6235,10 @@ var Cookie = RightJS.Cookie = new Class({
    * @return Cookie this
    */
   set: function(data) {
+    if (!isString(data)) { data = JSON.stringify(data); }
+
     var value = encodeURIComponent(data), options = this.options;
+
     if (options.domain) { value += '; domain=' + options.domain; }
     if (options.path)   { value += '; path=' + options.path; }
     if (options.duration) {
@@ -5997,7 +6260,12 @@ var Cookie = RightJS.Cookie = new Class({
     var value = this.options.document.cookie.match(
       '(?:^|;)\\s*' + RegExp.escape(this.name) + '=([^;]*)'
     );
-    return value ? decodeURIComponent(value[1]) : null;
+    if (value) {
+      value = decodeURIComponent(value[1]);
+      try { value = JSON.parse(value); }
+      catch (e) {}
+    }
+    return value || null;
   },
 
   /**
@@ -6012,651 +6280,30 @@ var Cookie = RightJS.Cookie = new Class({
 });
 
 
-/**
- * Old IE browser hacks
- *
- *   Keep them in one place so they were more compact
- *
- * Copyright (C) 2009-2011 Nikolay Nemshilov
- */
-if (RightJS.Browser.OLD && RightJS.Browser.IE) {
-  // loads DOM element extensions for selected elements
-  window.$ = RightJS.$ = (function(old_function) {
-    return function(id) {
-      var element = old_function(id);
-
-      // old IE browses match both, ID and NAME
-      if (element && element instanceof RightJS.Element &&
-        RightJS.isString(id) && element._.id !== id
-      ) {
-        element = RightJS.$(document).first('#'+ id);
-      }
-
-      return element;
-    };
-  })(RightJS.$);
-}
-
-
-/**
- * Making the 'submit' and 'change' events bubble under IE browsers
- *
- * Copyright (C) 2010-2011 Nikolay Nemshilov
- */
-
-/**
- * Tests if there is the event support
- *
- * @param String event name
- * @retrun Boolean check result
- */
-function event_support_for(name, tag) {
-  var e = document.createElement(tag);
-  e.setAttribute(name, ';');
-  return isFunction(e[name]);
-}
-
-if (!event_support_for('onsubmit', 'form')) {
-  /**
-   * Emulates the 'submit' event bubbling for IE browsers
-   *
-   * @param raw dom-event
-   * @return void
-   */
-  var submit_boobler = function(raw_event) {
-    var event = $(raw_event), element = event.target._,
-        type = element.type, form = element.form, parent;
-
-    if (form && (parent = $(form).parent()) && (
-      (raw_event.keyCode === 13   && (type === 'text'   || type === 'password')) ||
-      (raw_event.type === 'click' && (type === 'submit' || type === 'image'))
-    )) {
-      event.type   = 'submit';
-      event.target = $(form);
-      parent.fire(event);
-    }
-  };
-
-  document.attachEvent('onclick',    submit_boobler);
-  document.attachEvent('onkeypress', submit_boobler);
-}
-
-if (!event_support_for('onchange', 'input')) {
-
-  var get_input_value = function(target) {
-    var element = target._,
-        type    = element.type;
-
-    return type === 'radio' || type === 'checkbox' ?
-      element.checked : target.getValue();
-  },
-
-  /**
-   * Emulates the 'change' event bubbling
-   *
-   * @param Event wrapped dom-event
-   * @param Input wrapped input element
-   * @return void
-   */
-  change_boobler = function(event, target) {
-    var parent  = target.parent(),
-        value   = get_input_value(target);
-
-    if (parent && ''+target._prev_value !== ''+value) {
-      target._prev_value = value; // saving the value so it didn't fire up again
-      event.type = 'change';
-      parent.fire(event);
-    }
-  },
-
-  /**
-   * Catches the input field changes
-   *
-   * @param raw dom-event
-   * @return void
-   */
-  catch_inputs_access = function(raw_event) {
-    var event  = $(raw_event),
-        target = event.target,
-        type   = target._.type,
-        tag    = target._.tagName,
-        input_is_radio = (type === 'radio' || type === 'checkbox');
-
-    if (
-      (event.type === 'click' && (input_is_radio || tag === 'SELECT')) ||
-      (event.type === 'keydown' && (
-        (event.keyCode == 13 && (tag !== 'TEXTAREA')) ||
-        type === 'select-multiple'
-      ))
-    ) {
-      change_boobler(event, target);
-    }
-  },
-
-  /**
-   * Catch inputs blur
-   *
-   * @param raw dom-event
-   * @return void
-   */
-  catch_input_left = function(raw_event) {
-    var event  = $(raw_event),
-        target = event.target;
-
-    if (target instanceof Input) {
-      change_boobler(event, target);
-    }
-  };
-
-  document.attachEvent('onclick',    catch_inputs_access);
-  document.attachEvent('onkeydown',  catch_inputs_access);
-  document.attachEvent('onfocusout', catch_input_left);
-
-  /**
-   * storing the input element previous value, so we could figure out
-   * if it was changed later on
-   */
-  document.attachEvent('onbeforeactivate', function(event) {
-    var element = $(event).target;
-
-    if (element instanceof Input) {
-      element._prev_value = get_input_value(element);
-    }
-  });
-}
-
-
-/**
- * Konqueror browser fixes
- *
- * Copyright (C) 2009-2011 Nikolay V. Nemshilov
- */
-
-/**
- * manual position calculator, it works for Konqueror and also
- * for old versions of Opera and FF
- */
-if (!RightJS.$E('p')._.getBoundingClientRect) {
-  RightJS.Element.include({
-    position: function() {
-      var element  = this._,
-          top      = element.offsetTop,
-          left     = element.offsetLeft,
-          parent   = element.offsetParent;
-
-      while (parent) {
-        top  += parent.offsetTop;
-        left += parent.offsetLeft;
-
-        parent = parent.offsetParent;
-      }
-
-      return {x: left, y: top};
-    }
-  });
-}
-
-
-/**
- * The manual css-selector feature implementation
- *
- * Credits:
- *   - Sizzle    (http://sizzlejs.org)      Copyright (C) John Resig
- *   - MooTools  (http://mootools.net)      Copyright (C) Valerio Proietti
- *
- * Copyright (C) 2009-2011 Nikolay V. Nemshilov
- */
-var has_native_css_selector = !!document.querySelector,
-    needs_css_engine_patch  = !has_native_css_selector;
-
-if (RightJS.Browser.IE8L) {
-  needs_css_engine_patch = true;
-}
-
-if (needs_css_engine_patch) {
-  /**
-   * The token searchers collection
-   */
-  var search = {
-    // search for any descendant nodes
-    ' ': function(element, tag) {
-      return RightJS.$A(element.getElementsByTagName(tag));
-    },
-
-    // search for immidate descendant nodes
-    '>': function(element, tag) {
-      var result = [], node = element.firstChild;
-      while (node) {
-        if (tag === '*' || node.tagName === tag) {
-          result.push(node);
-        }
-        node = node.nextSibling;
-      }
-      return result;
-    },
-
-    // search for immiate sibling nodes
-    '+': function(element, tag) {
-      while ((element = element.nextSibling)) {
-        if (element.tagName) {
-          return (tag === '*' || element.tagName === tag) ? [element] : [];
-        }
-      }
-      return [];
-    },
-
-    // search for late sibling nodes
-    '~': function(element, tag) {
-      var result = [];
-      while ((element = element.nextSibling)) {
-        if (tag === '*' || element.tagName === tag) {
-          result.push(element);
-        }
-      }
-      return result;
-    }
-  },
-
-
-  /**
-   * Collection of pseudo selector matchers
-   */
-  pseudos = {
-    not: function(node, css_rule) {
-      return node.nodeType === 1 && !RightJS.$(node).match(css_rule);
-    },
-
-    checked: function(node) {
-      return node.checked === true;
-    },
-
-    enabled: function(node) {
-      return node.disabled === false;
-    },
-
-    disabled: function(node) {
-      return node.disabled === true;
-    },
-
-    selected: function(node) {
-      return node.selected === true;
-    },
-
-    empty: function(node) {
-      return !node.firstChild;
-    },
-
-    'first-child': function(node, node_name) {
-      while ((node = node.previousSibling)) {
-        if (node.nodeType === 1 && (node_name === null || node.nodeName === node_name)) {
-          return false;
-        }
-      }
-      return true;
-    },
-
-    'first-of-type': function(node) {
-      return pseudos['first-child'](node, node.nodeName);
-    },
-
-    'last-child': function(node, node_name) {
-      while ((node = node.nextSibling)) {
-        if (node.nodeType === 1 && (node_name === null || node.nodeName === node_name)) {
-          return false;
-        }
-      }
-      return true;
-    },
-
-    'last-of-type': function(node) {
-      return pseudos['last-child'](node, node.nodeName);
-    },
-
-    'only-child': function(node, node_name) {
-      return pseudos['first-child'](node, node_name) &&
-        pseudos['last-child'](node, node_name);
-    },
-
-    'only-of-type': function(node) {
-      return pseudos['only-child'](node, node.nodeName);
-    },
-
-    'nth-child': function(node, number, node_name, reverse) {
-      var index = 1, a = number[0], b = number[1];
-
-      while ((node = (reverse === true) ? node.nextSibling : node.previousSibling)) {
-        if (node.nodeType === 1 && (node_name === undefined || node.nodeName === node_name)) {
-          index++;
-        }
-      }
-
-      return (b === undefined ? (index === a) : ((index - b) % a === 0 && (index - b) / a >= 0));
-    },
-
-    'nth-of-type': function(node, number) {
-      return pseudos['nth-child'](node, number, node.nodeName);
-    },
-
-    'nth-last-child': function(node, number) {
-      return pseudos['nth-child'](node, number, undefined, true);
-    },
-
-    'nth-last-of-type': function(node, number) {
-      return pseudos['nth-child'](node, number, node.nodeName, true);
-    }
-  },
-
-  // the regexps collection
-  chunker   = /((?:\((?:\([^()]+\)|[^()]+)+\)|\[(?:\[[^\[\]]*\]|['"][^'"]*['"]|[^\[\]'"]+)+\]|\\.|[^ >+~,(\[\\]+)+|[>+~])(\s*,\s*)?/g,
-  id_re     = /#([\w\-_]+)/,
-  tag_re    = /^[\w\*]+/,
-  class_re  = /\.([\w\-\._]+)/,
-  pseudo_re = /:([\w\-]+)(\((.+?)\))*$/,
-  attrs_re  = /\[((?:[\w\-]*:)?[\w\-]+)\s*(?:([!\^$*~|]?=)\s*((['"])([^\4]*?)\4|([^'"][^\]]*?)))?\]/,
-
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
-
-  /**
-   * Builds an atom matcher
-   *
-   * @param String atom definition
-   * @return Object atom matcher
-   */
-  atoms_cache = {},
-  build_atom = function(in_atom) {
-    if (!atoms_cache[in_atom]) {
-      var id, tag, classes, classes_length, attrs, pseudo,
-        values_of_pseudo, match, func, desc = {}, atom = in_atom;
-
-      // grabbing the attributes
-      while((match = atom.match(attrs_re))) {
-        attrs = attrs || {};
-        attrs[match[1]] = { o: match[2] || '', v: match[5] || match[6] || '' };
-        atom = atom.replace(match[0], '');
-      }
-
-      // extracting the pseudos
-      if ((match = atom.match(pseudo_re))) {
-        pseudo = match[1];
-        values_of_pseudo = match[3] === '' ? null : match[3];
-
-        if (pseudo.startsWith('nth')) {
-          // preparsing the nth-child pseoudo numbers
-          values_of_pseudo = values_of_pseudo.toLowerCase();
-
-          if (values_of_pseudo === 'n') {
-            // no need in the pseudo then
-            pseudo = null;
-            values_of_pseudo = null;
-          } else {
-            if (values_of_pseudo === 'odd')  { values_of_pseudo = '2n+1'; }
-            if (values_of_pseudo === 'even') { values_of_pseudo = '2n';   }
-
-            var m = /^([+\-]?\d*)?n([+\-]?\d*)?$/.exec(values_of_pseudo);
-            if (m) {
-              values_of_pseudo = [
-                m[1] === '-' ? -1 : parseInt(m[1], 10) || 1,
-                parseInt(m[2], 10) || 0
-              ];
-            } else {
-              values_of_pseudo = [parseInt(values_of_pseudo, 10), undefined];
-            }
-          }
-        }
-
-        atom = atom.replace(match[0], '');
-      }
-
-      // getting all the other options
-      id      = (atom.match(id_re)    || [1, null])[1];
-      tag     = (atom.match(tag_re)   || '*').toString().toUpperCase();
-      classes = (atom.match(class_re) || [1, ''])[1].split('.').without('');
-      classes_length = classes.length;
-
-      desc.tag = tag;
-
-      if (id || classes.length || attrs || pseudo) {
-        // optimizing a bit the values for quiker runtime checks
-        id      = id     || false;
-        attrs   = attrs  || false;
-        pseudo  = pseudo in pseudos ? pseudos[pseudo] : false;
-        classes = classes_length ? classes : false;
-
-        desc.filter = function(elements) {
-          var node, result = [], i=0, j=0, l = elements.length, failed;
-          for (; i < l; i++) {
-            node   = elements[i];
-
-            //////////////////////////////////////////////
-            // ID check
-            //
-            if (id !== false && node.id !== id) {
-              continue;
-            }
-
-            //////////////////////////////////////////////
-            // Class names check
-            if (classes !== false) {
-              var names = node.className.split(' '),
-                  names_length = names.length,
-                  x = 0; failed = false;
-
-              for (; x < classes_length; x++) {
-                for (var y=0, found = false; y < names_length; y++) {
-                  if (classes[x] === names[y]) {
-                    found = true;
-                    break;
-                  }
-                }
-
-                if (!found) {
-                  failed = true;
-                  break;
-                }
-              }
-
-              if (failed) { continue; }
-            }
-
-            ///////////////////////////////////////////////
-            // Attributes check
-            if (attrs !== false) {
-              var key, attr, operand, value; failed = false;
-              for (key in attrs) {
-                attr = key === 'class' ? node.className : (node.getAttribute(key) || '');
-                operand = attrs[key].o;
-                value   = attrs[key].v;
-
-                if (
-                  (operand === ''   && (key === 'class'|| key === 'lang' ?
-                    (attr === '') : (node.getAttributeNode(key) === null))) ||
-                  (operand === '='  && attr !== value) ||
-                  (operand === '*=' && attr.indexOf(value) === -1) ||
-                  (operand === '^=' && attr.indexOf(value) !== 0)  ||
-                  (operand === '$=' && attr.substring(attr.length - value.length) !== value) ||
-                  (operand === '~=' && attr.split(' ').indexOf(value) === -1) ||
-                  (operand === '|=' && attr.split('-').indexOf(value) === -1)
-                ) { failed = true; break; }
-              }
-
-              if (failed) { continue; }
-            }
-
-            ///////////////////////////////////////////////
-            // Pseudo selectors check
-            if (pseudo !== false) {
-              if (!pseudo(node, values_of_pseudo)) {
-                continue;
-              }
-            }
-
-            result[j++] = node;
-          }
-          return result;
-        };
-      }
-
-      atoms_cache[in_atom] = desc;
-    }
-
-    return atoms_cache[in_atom];
-  },
-
-  /**
-   * Builds a single selector out of a simple rule chunk
-   *
-   * @param Array of a single rule tokens
-   * @return Function selector
-   */
-  tokens_cache = {},
-  build_selector = function(rule) {
-    var rule_key = rule.join('');
-    if (!tokens_cache[rule_key]) {
-      for (var i=0; i < rule.length; i++) {
-        rule[i][1] = build_atom(rule[i][1]);
-      }
-
-      // creates a list of uniq nodes
-      var _uid = RightJS.$uid;
-      var uniq = function(elements) {
-        var uniq = [], uids = [], uid;
-        for (var i=0, length = elements.length; i < length; i++) {
-          uid = _uid(elements[i]);
-          if (!uids[uid]) {
-            uniq.push(elements[i]);
-            uids[uid] = true;
-          }
-        }
-
-        return uniq;
-      };
-
-      // performs the actual search of subnodes
-      var find_subnodes = function(element, atom) {
-        var result = search[atom[0]](element, atom[1].tag);
-        return atom[1].filter ? atom[1].filter(result) : result;
-      };
-
-      // building the actual selector function
-      tokens_cache[rule_key] = function(element) {
-        var founds, sub_founds;
-
-        for (var i=0, i_length = rule.length; i < i_length; i++) {
-          if (i === 0) {
-            founds = find_subnodes(element, rule[i]);
-
-          } else {
-            if (i > 1) { founds = uniq(founds); }
-
-            for (var j=0; j < founds.length; j++) {
-              sub_founds = find_subnodes(founds[j], rule[i]);
-
-              sub_founds.unshift(1); // <- nuke the parent node out of the list
-              sub_founds.unshift(j); // <- position to insert the subresult
-
-              founds.splice.apply(founds, sub_founds);
-
-              j += sub_founds.length - 3;
-            }
-          }
-        }
-
-        return rule.length > 1 ? uniq(founds) : founds;
-      };
-    }
-    return tokens_cache[rule_key];
-  },
-
-
-  /**
-   * Builds the list of selectors for the css_rule
-   *
-   * @param String raw css-rule
-   * @return Array of selectors
-   */
-  selectors_cache = {}, chunks_cache = {},
-  split_rule_to_selectors = function(css_rule) {
-    if (!selectors_cache[css_rule]) {
-      chunker.lastIndex = 0;
-
-      var rules = [], rule = [], rel = ' ', m, token;
-      while ((m = chunker.exec(css_rule))) {
-        token = m[1];
-
-        if (token === '+' || token === '>' || token === '~') {
-          rel = token;
-        } else {
-          rule.push([rel, token]);
-          rel = ' ';
-        }
-
-        if (m[2]) {
-          rules.push(build_selector(rule));
-          rule = [];
-        }
-      }
-      rules.push(build_selector(rule));
-
-      selectors_cache[css_rule] = rules;
-    }
-    return selectors_cache[css_rule];
-  },
-
-
-  /**
-   * The top level method, it just goes throught the css-rule chunks
-   * collect and merge the results that's it
-   *
-   * @param Element context
-   * @param String raw css-rule
-   * @return Array search result
-   */
-  select_all = function(element, css_rule) {
-    var selectors = split_rule_to_selectors(css_rule), result = [];
-    for (var i=0, length = selectors.length; i < length; i++) {
-      result = result.concat(selectors[i](element));
-    }
-
-    return result;
-  },
-
-
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
-
-  // the previous dom-selection methods replacement
-  dom_extension = {
-    first: function(css_rule) {
-      return this.find(css_rule)[0];
-    },
-
-    find: function(css_rule, raw) {
-      var result, rule = css_rule || '*', element = this._, tag = element.tagName;
-
-      if (has_native_css_selector) {
-        try { // trying to reuse native css-engine under IE8
-          result = $A(element.querySelectorAll(rule));
-        } catch(e) { // if it fails use our own engine
-          result = select_all(element, rule);
-        }
-      } else {
-        result = select_all(element, rule);
-      }
-
-      return raw === true ? result : result.map(RightJS.$);
-    }
-  };
-
-  // hooking up the rightjs wrappers with the new methods
-  RightJS.$ext(RightJS.Element.prototype, dom_extension);
-  RightJS.$ext(RightJS.Document.prototype, dom_extension);
-}
-
 // globalizing the top-level variables
 $ext(window, Object.without(RightJS, 'version', 'modules'));
 
 return RightJS;
 })(window, document, Object, Array, String, Function, Number, Math);
+/**
+ * The old browsers support patch loading script
+ * will be included in the core file when it's built
+ * with the no-olds option
+ *
+ * Basically it just checks all the script tags on the page
+ * finds the core inclusion tag and uses it's src attribute
+ * to dynamically load the olds patch
+ *
+ * Copyright (C) 2009-2011 Nikolay V. Nemshilov
+ */
+if (RightJS.Browser.OLD) {
+  (function(d) {
+    var script  = d.createElement('script'),
+        scripts = d.getElementsByTagName('script'),
+        rjs_spt = scripts[scripts.length - 1];
+
+    script.src = rjs_spt.src.replace(/(^|\/)(right)([^\/]+)$/, '$1$2-olds$3');
+
+    rjs_spt.parentNode.appendChild(script);
+  })(document);
+}
